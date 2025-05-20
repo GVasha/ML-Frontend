@@ -353,6 +353,30 @@ const SearchButton = styled(Button)`
   font-size: 0.9rem;
 `;
 
+const SegmentedControl = styled.div`
+  display: flex;
+  background-color: #f0f0f0;
+  border-radius: 4px;
+  padding: 4px;
+  margin-bottom: 1rem;
+`;
+
+const SegmentButton = styled.button`
+  flex: 1;
+  background-color: ${({ active, theme }) => active ? theme.colors.primary : 'transparent'};
+  color: ${({ active }) => active ? 'white' : '#555'};
+  border: none;
+  border-radius: 4px;
+  padding: 8px 16px;
+  cursor: pointer;
+  font-weight: ${({ active }) => active ? '600' : '400'};
+  transition: all 0.2s;
+  
+  &:hover {
+    background-color: ${({ active, theme }) => active ? theme.colors.primary : '#e0e0e0'};
+  }
+`;
+
 const PricePredictorPage = () => {
   const [formData, setFormData] = useState({
     "Pantalla_Tamaño de la pantalla": "",
@@ -394,8 +418,10 @@ const PricePredictorPage = () => {
   };
   
   const handleClear = () => {
+    const isLaptop = formData["is_laptop"] === "1";
+    
     setFormData({
-      "Pantalla_Tamaño de la pantalla": "",
+      "Pantalla_Tamaño de la pantalla": isLaptop ? "" : "0",
       "Pantalla_Tecnología de la pantalla": "",
       "Procesador_Procesador": "",
       "Procesador_Número de núcleos del procesador": "",
@@ -409,12 +435,12 @@ const PricePredictorPage = () => {
       "Gráfica_Tipo de memoria gráfica": "",
       "Sistema operativo_Sistema operativo": "",
       "Medidas y peso_Peso": "",
-      "Alimentación_Batería": "",
-      "Alimentación_Autonomía de la batería": "",
-      "Alimentación_Vatios-hora": "",
+      "Alimentación_Batería": isLaptop ? "" : "",
+      "Alimentación_Autonomía de la batería": isLaptop ? "" : "0",
+      "Alimentación_Vatios-hora": isLaptop ? "" : "0",
       "marca": "",
       "product_type_group": "",
-      "is_laptop": "1"
+      "is_laptop": isLaptop ? "1" : "0"
     });
     setResult(null);
     setError(null);
@@ -498,6 +524,48 @@ const PricePredictorPage = () => {
     }
   };
   
+  const handleDeviceTypeChange = (isLaptop) => {
+    // Update is_laptop and reset form values that are specific to the device type
+    setFormData(prevData => {
+      const newData = {
+        ...prevData,
+        "is_laptop": isLaptop ? "1" : "0",
+        // Clear values that don't apply to desktops
+        "Alimentación_Batería": isLaptop ? prevData["Alimentación_Batería"] : "",
+        "Alimentación_Autonomía de la batería": isLaptop ? prevData["Alimentación_Autonomía de la batería"] : "0",
+        "Alimentación_Vatios-hora": isLaptop ? prevData["Alimentación_Vatios-hora"] : "0",
+        "Pantalla_Tamaño de la pantalla": isLaptop ? prevData["Pantalla_Tamaño de la pantalla"] : "0",
+        "product_type_group": isLaptop ? 
+          (prevData["product_type_group"] || "") :
+          (prevData["product_type_group"] === "Laptop – Gaming" ? "Desktop – Gaming" : 
+           prevData["product_type_group"] === "Laptop – Standard" ? "Desktop – Standard" : "")
+      };
+      
+      // Initialize desktop-specific fields when switching to desktop
+      if (!isLaptop) {
+        newData["Procesador_Zócalo de CPU"] = prevData["Procesador_Zócalo de CPU"] || "";
+        newData["Procesador_TDP"] = prevData["Procesador_TDP"] || "";
+        newData["Propiedades de la carcasa_Alimentación"] = prevData["Propiedades de la carcasa_Alimentación"] || "";
+        newData["Propiedades de la carcasa_Tipo de caja"] = prevData["Propiedades de la carcasa_Tipo de caja"] || "";
+        
+        // Set communication defaults for desktops
+        newData["Comunicaciones_lan"] = "1";
+        newData["Comunicaciones_bluetooth"] = "0";
+      } else {
+        // Set communication defaults for laptops
+        newData["Comunicaciones_lan"] = "0";
+        newData["Comunicaciones_bluetooth"] = "1";
+      }
+      
+      return newData;
+    });
+    
+    // Reset search results when changing device type
+    setResult(null);
+    setAmazonResults(null);
+    setAmazonError(null);
+  };
+  
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -532,49 +600,89 @@ const PricePredictorPage = () => {
   
   return (
     <Container>
-      <Title>Laptop Price Predictor</Title>
-      <Subtitle>Enter the specifications of a laptop to get an estimated market price. You don't need to fill all fields.</Subtitle>
+      <Title>Computer Price Predictor</Title>
+      <Subtitle>Enter the specifications to get an estimated market price. You don't need to fill all fields.</Subtitle>
       
       {error && <ErrorMessage>{error}</ErrorMessage>}
       
       <Form onSubmit={handleSubmit}>
         <FormSection>
-          <SectionTitle>Display</SectionTitle>
-          <FormGrid>
-            <FormGroup>
-              <Label htmlFor="Pantalla_Tamaño de la pantalla">Screen Size (inches)</Label>
-              <Select
-                id="Pantalla_Tamaño de la pantalla"
-                name="Pantalla_Tamaño de la pantalla"
-                value={formData["Pantalla_Tamaño de la pantalla"]}
-                onChange={handleChange}
-              >
-                <option value="">Select Size</option>
-                <option value="13.3">13.3"</option>
-                <option value="14.0">14.0"</option>
-                <option value="15.6">15.6"</option>
-                <option value="16.0">16.0"</option>
-                <option value="17.3">17.3"</option>
-              </Select>
-            </FormGroup>
-            
-            <FormGroup>
-              <Label htmlFor="Pantalla_Tecnología de la pantalla">Screen Technology</Label>
-              <Select
-                id="Pantalla_Tecnología de la pantalla"
-                name="Pantalla_Tecnología de la pantalla"
-                value={formData["Pantalla_Tecnología de la pantalla"]}
-                onChange={handleChange}
-              >
-                <option value="">Select Technology</option>
-                <option value="Full HD">Full HD</option>
-                <option value="QHD">QHD</option>
-                <option value="4K">4K</option>
-                <option value="Retina">Retina</option>
-              </Select>
-            </FormGroup>
-          </FormGrid>
+          <SectionTitle>Device Type</SectionTitle>
+          <SegmentedControl>
+            <SegmentButton 
+              type="button"
+              active={formData["is_laptop"] === "1"}
+              onClick={() => handleDeviceTypeChange(true)}
+            >
+              Laptop
+            </SegmentButton>
+            <SegmentButton 
+              type="button"
+              active={formData["is_laptop"] === "0"}
+              onClick={() => handleDeviceTypeChange(false)}
+            >
+              Desktop
+            </SegmentButton>
+          </SegmentedControl>
         </FormSection>
+        
+        {/* Only show display section for laptops */}
+        {formData["is_laptop"] === "1" && (
+          <FormSection>
+            <SectionTitle>Display</SectionTitle>
+            <FormGrid>
+              <FormGroup>
+                <Label htmlFor="Pantalla_Tamaño de la pantalla">Screen Size (inches)</Label>
+                <Select
+                  id="Pantalla_Tamaño de la pantalla"
+                  name="Pantalla_Tamaño de la pantalla"
+                  value={formData["Pantalla_Tamaño de la pantalla"]}
+                  onChange={handleChange}
+                >
+                  <option value="">Select Size</option>
+                  <option value="10.1">10.1"</option>
+                  <option value="11.6">11.6"</option>
+                  <option value="12.0">12.0"</option>
+                  <option value="12.5">12.5"</option>
+                  <option value="13.0">13.0"</option>
+                  <option value="13.3">13.3"</option>
+                  <option value="13.5">13.5"</option>
+                  <option value="14.0">14.0"</option>
+                  <option value="15.0">15.0"</option>
+                  <option value="15.6">15.6"</option>
+                  <option value="16.0">16.0"</option>
+                  <option value="16.1">16.1"</option>
+                  <option value="17.0">17.0"</option>
+                  <option value="17.3">17.3"</option>
+                </Select>
+              </FormGroup>
+              
+              <FormGroup>
+                <Label htmlFor="Pantalla_Tecnología de la pantalla">Screen Technology</Label>
+                <Select
+                  id="Pantalla_Tecnología de la pantalla"
+                  name="Pantalla_Tecnología de la pantalla"
+                  value={formData["Pantalla_Tecnología de la pantalla"]}
+                  onChange={handleChange}
+                >
+                  <option value="">Select Technology</option>
+                  <option value="2K">2K</option>
+                  <option value="4K">4K</option>
+                  <option value="FHD+">FHD+</option>
+                  <option value="Full HD">Full HD</option>
+                  <option value="HD Ready">HD Ready</option>
+                  <option value="HD+">HD+</option>
+                  <option value="QHD">QHD</option>
+                  <option value="QHD+">QHD+</option>
+                  <option value="Retina">Retina</option>
+                  <option value="UHD+">UHD+</option>
+                  <option value="Ultra HD">Ultra HD</option>
+                  <option value="WQHD">WQHD</option>
+                </Select>
+              </FormGroup>
+            </FormGrid>
+          </FormSection>
+        )}
         
         <FormSection>
           <SectionTitle>Processor</SectionTitle>
@@ -588,15 +696,21 @@ const PricePredictorPage = () => {
                 onChange={handleChange}
               >
                 <option value="">Select Processor</option>
-                <option value="Intel Core i3">Intel Core i3</option>
-                <option value="Intel Core i5">Intel Core i5</option>
-                <option value="Intel Core i7">Intel Core i7</option>
-                <option value="Intel Core i9">Intel Core i9</option>
+                <option value="AMD Ryzen 3">AMD Ryzen 3</option>
                 <option value="AMD Ryzen 5">AMD Ryzen 5</option>
                 <option value="AMD Ryzen 7">AMD Ryzen 7</option>
                 <option value="AMD Ryzen 9">AMD Ryzen 9</option>
                 <option value="Apple M1 Family">Apple M1 Family</option>
                 <option value="Apple M2 Family">Apple M2 Family</option>
+                <option value="Apple M3 Family">Apple M3 Family</option>
+                <option value="Intel Celeron">Intel Celeron</option>
+                <option value="Intel Core Ultra">Intel Core Ultra</option>
+                <option value="Intel Core i3">Intel Core i3</option>
+                <option value="Intel Core i5">Intel Core i5</option>
+                <option value="Intel Core i7">Intel Core i7</option>
+                <option value="Intel Core i9">Intel Core i9</option>
+                <option value="Intel Pentium">Intel Pentium</option>
+                <option value="Qualcomm Snapdragon">Qualcomm Snapdragon</option>
               </Select>
             </FormGroup>
             
@@ -609,12 +723,16 @@ const PricePredictorPage = () => {
                 onChange={handleChange}
               >
                 <option value="">Select Cores</option>
+                <option value="2">2 cores</option>
                 <option value="4">4 cores</option>
                 <option value="6">6 cores</option>
                 <option value="8">8 cores</option>
                 <option value="10">10 cores</option>
                 <option value="12">12 cores</option>
+                <option value="14">14 cores</option>
                 <option value="16">16 cores</option>
+                <option value="20">20 cores</option>
+                <option value="24">24 cores</option>
               </Select>
             </FormGroup>
             
@@ -632,6 +750,46 @@ const PricePredictorPage = () => {
                 <option value="5">5.0 GHz</option>
               </Select>
             </FormGroup>
+            
+            {formData["is_laptop"] === "0" && (
+              <FormGroup>
+                <Label htmlFor="Procesador_Zócalo de CPU">CPU Socket</Label>
+                <Select
+                  id="Procesador_Zócalo de CPU"
+                  name="Procesador_Zócalo de CPU"
+                  value={formData["Procesador_Zócalo de CPU"]}
+                  onChange={handleChange}
+                >
+                  <option value="">Select Socket</option>
+                  <option value="Socket 1151">Socket 1151</option>
+                  <option value="Socket 1200">Socket 1200</option>
+                  <option value="Socket 1700">Socket 1700 (Default)</option>
+                  <option value="Socket AM4">Socket AM4</option>
+                  <option value="Socket AM5">Socket AM5</option>
+                </Select>
+              </FormGroup>
+            )}
+            
+            {formData["is_laptop"] === "0" && (
+              <FormGroup>
+                <Label htmlFor="Procesador_TDP">TDP (W)</Label>
+                <Select
+                  id="Procesador_TDP"
+                  name="Procesador_TDP"
+                  value={formData["Procesador_TDP"]}
+                  onChange={handleChange}
+                >
+                  <option value="">Select TDP</option>
+                  <option value="35">35W</option>
+                  <option value="45">45W</option>
+                  <option value="65">65W (Default)</option>
+                  <option value="95">95W</option>
+                  <option value="105">105W</option>
+                  <option value="125">125W</option>
+                  <option value="165">165W</option>
+                </Select>
+              </FormGroup>
+            )}
           </FormGrid>
         </FormSection>
         
@@ -649,9 +807,14 @@ const PricePredictorPage = () => {
                 <option value="">Select RAM</option>
                 <option value="4">4 GB</option>
                 <option value="8">8 GB</option>
+                <option value="12">12 GB</option>
                 <option value="16">16 GB</option>
+                <option value="24">24 GB</option>
                 <option value="32">32 GB</option>
+                <option value="48">48 GB</option>
                 <option value="64">64 GB</option>
+                <option value="96">96 GB</option>
+                <option value="128">128 GB</option>
               </Select>
             </FormGroup>
             
@@ -695,10 +858,12 @@ const PricePredictorPage = () => {
                 onChange={handleChange}
               >
                 <option value="">Select Capacity</option>
+                <option value="128">128 GB</option>
                 <option value="256">256 GB</option>
                 <option value="512">512 GB</option>
                 <option value="1000">1 TB</option>
                 <option value="2000">2 TB</option>
+                <option value="4000">4 TB</option>
               </Select>
             </FormGroup>
           </FormGrid>
@@ -716,14 +881,27 @@ const PricePredictorPage = () => {
                 onChange={handleChange}
               >
                 <option value="">Select Graphics Card</option>
+                <option value="AMD Radeon RX 6400 Series">AMD Radeon RX 6400 Series</option>
+                <option value="AMD Radeon RX 6500 Series">AMD Radeon RX 6500 Series</option>
+                <option value="AMD Radeon RX 6600 Series">AMD Radeon RX 6600 Series</option>
+                <option value="AMD Radeon RX 6700 Series">AMD Radeon RX 6700 Series</option>
+                <option value="AMD Radeon RX 7600 Series">AMD Radeon RX 7600 Series</option>
+                <option value="AMD Radeon RX 7900 Series">AMD Radeon RX 7900 Series</option>
+                <option value="Apple GPUs">Apple GPUs</option>
+                <option value="Intel Arc">Intel Arc</option>
+                <option value="Intel HD">Intel HD</option>
                 <option value="Intel Iris">Intel Iris</option>
                 <option value="Intel UHD">Intel UHD</option>
+                <option value="Intel Xe">Intel Xe</option>
+                <option value="NVIDIA GeForce GTX Series">NVIDIA GeForce GTX Series</option>
                 <option value="NVIDIA GeForce MX Series">NVIDIA GeForce MX Series</option>
                 <option value="NVIDIA GeForce RTX 3050 Series">NVIDIA GeForce RTX 3050 Series</option>
                 <option value="NVIDIA GeForce RTX 3060 Series">NVIDIA GeForce RTX 3060 Series</option>
                 <option value="NVIDIA GeForce RTX 3070 Series">NVIDIA GeForce RTX 3070 Series</option>
-                <option value="AMD Radeon RX 6600 Series">AMD Radeon RX 6600 Series</option>
-                <option value="Apple GPUs">Apple GPUs</option>
+                <option value="NVIDIA GeForce RTX 3080 Series">NVIDIA GeForce RTX 3080 Series</option>
+                <option value="NVIDIA GeForce RTX 4050 Series">NVIDIA GeForce RTX 4050 Series</option>
+                <option value="NVIDIA GeForce RTX 4060 Series">NVIDIA GeForce RTX 4060 Series</option>
+                <option value="NVIDIA GeForce RTX 4070 Series">NVIDIA GeForce RTX 4070 Series</option>
               </Select>
             </FormGroup>
             
@@ -736,11 +914,14 @@ const PricePredictorPage = () => {
                 onChange={handleChange}
               >
                 <option value="">Select Memory</option>
+                <option value="1">1 GB</option>
                 <option value="2">2 GB</option>
                 <option value="4">4 GB</option>
                 <option value="6">6 GB</option>
                 <option value="8">8 GB</option>
+                <option value="10">10 GB</option>
                 <option value="12">12 GB</option>
+                <option value="16">16 GB</option>
               </Select>
             </FormGroup>
             
@@ -753,9 +934,11 @@ const PricePredictorPage = () => {
                 onChange={handleChange}
               >
                 <option value="">Select Type</option>
-                <option value="Shared">Shared</option>
+                <option value="DDR3">DDR3</option>
                 <option value="GDDR5">GDDR5</option>
                 <option value="GDDR6">GDDR6</option>
+                <option value="GDDR6X">GDDR6X</option>
+                <option value="Shared">Shared</option>
                 <option value="Unified">Unified</option>
               </Select>
             </FormGroup>
@@ -774,13 +957,14 @@ const PricePredictorPage = () => {
                 onChange={handleChange}
               >
                 <option value="">Select OS</option>
-                <option value="windows 11 home">Windows 11 Home</option>
-                <option value="windows 11 professional">Windows 11 Professional</option>
+                <option value="chrome_os">Chrome OS</option>
+                <option value="freedos">FreeDOS</option>
+                <option value="macos">macOS</option>
+                <option value="no_os">No OS</option>
                 <option value="windows 10 home">Windows 10 Home</option>
                 <option value="windows 10 professional">Windows 10 Professional</option>
-                <option value="macos">macOS</option>
-                <option value="chrome_os">Chrome OS</option>
-                <option value="no_os">No OS</option>
+                <option value="windows 11 home">Windows 11 Home</option>
+                <option value="windows 11 professional">Windows 11 Professional</option>
               </Select>
             </FormGroup>
             
@@ -793,12 +977,21 @@ const PricePredictorPage = () => {
                 onChange={handleChange}
               >
                 <option value="">Select Weight</option>
+                <option value="0.9">0.9 kg</option>
                 <option value="1.0">1.0 kg</option>
+                <option value="1.1">1.1 kg</option>
+                <option value="1.2">1.2 kg</option>
                 <option value="1.3">1.3 kg</option>
+                <option value="1.4">1.4 kg</option>
                 <option value="1.5">1.5 kg</option>
-                <option value="1.7">1.7 kg</option>
+                <option value="1.6">1.6 kg</option>
+                <option value="1.7">1.7 kg (Default)</option>
+                <option value="1.8">1.8 kg</option>
+                <option value="1.9">1.9 kg</option>
                 <option value="2.0">2.0 kg</option>
+                <option value="2.2">2.2 kg</option>
                 <option value="2.5">2.5 kg</option>
+                <option value="3.0">3.0 kg</option>
               </Select>
             </FormGroup>
             
@@ -811,70 +1004,133 @@ const PricePredictorPage = () => {
                 onChange={handleChange}
               >
                 <option value="">Select Brand</option>
-                <option value="Lenovo">Lenovo</option>
-                <option value="Dell">Dell</option>
-                <option value="HP">HP</option>
-                <option value="ASUS">ASUS</option>
                 <option value="Acer">Acer</option>
                 <option value="Apple">Apple</option>
-                <option value="MSI">MSI</option>
+                <option value="ASUS">ASUS</option>
+                <option value="Dell">Dell</option>
+                <option value="Fujitsu">Fujitsu</option>
+                <option value="GigaByte">GigaByte</option>
+                <option value="HP">HP</option>
+                <option value="Huawei">Huawei</option>
+                <option value="Lenovo">Lenovo (Default)</option>
+                <option value="LG">LG</option>
                 <option value="Microsoft">Microsoft</option>
+                <option value="MSI">MSI</option>
+                <option value="Razer">Razer</option>
+                <option value="Samsung">Samsung</option>
               </Select>
             </FormGroup>
           </FormGrid>
         </FormSection>
         
-        <FormSection>
-          <SectionTitle>Battery Information</SectionTitle>
-          <FormGrid>
-            <FormGroup>
-              <Label htmlFor="Alimentación_Batería">Battery Type</Label>
-              <Select
-                id="Alimentación_Batería"
-                name="Alimentación_Batería"
-                value={formData["Alimentación_Batería"]}
-                onChange={handleChange}
-              >
-                <option value="">Select Type</option>
-                <option value="lithium">Lithium</option>
-              </Select>
-            </FormGroup>
-            
-            <FormGroup>
-              <Label htmlFor="Alimentación_Autonomía de la batería">Battery Autonomy (hours)</Label>
-              <Select
-                id="Alimentación_Autonomía de la batería"
-                name="Alimentación_Autonomía de la batería"
-                value={formData["Alimentación_Autonomía de la batería"]}
-                onChange={handleChange}
-              >
-                <option value="">Select Hours</option>
-                <option value="6">6 hours</option>
-                <option value="8">8 hours</option>
-                <option value="10">10 hours</option>
-                <option value="12">12 hours</option>
-                <option value="15">15 hours</option>
-              </Select>
-            </FormGroup>
-            
-            <FormGroup>
-              <Label htmlFor="Alimentación_Vatios-hora">Watt-hours</Label>
-              <Select
-                id="Alimentación_Vatios-hora"
-                name="Alimentación_Vatios-hora"
-                value={formData["Alimentación_Vatios-hora"]}
-                onChange={handleChange}
-              >
-                <option value="">Select Watt-hours</option>
-                <option value="45">45 Wh</option>
-                <option value="55">55 Wh</option>
-                <option value="65">65 Wh</option>
-                <option value="80">80 Wh</option>
-                <option value="100">100 Wh</option>
-              </Select>
-            </FormGroup>
-          </FormGrid>
-        </FormSection>
+        {/* Only show battery section for laptops */}
+        {formData["is_laptop"] === "1" && (
+          <FormSection>
+            <SectionTitle>Battery Information</SectionTitle>
+            <FormGrid>
+              <FormGroup>
+                <Label htmlFor="Alimentación_Batería">Battery Type</Label>
+                <Select
+                  id="Alimentación_Batería"
+                  name="Alimentación_Batería"
+                  value={formData["Alimentación_Batería"]}
+                  onChange={handleChange}
+                >
+                  <option value="">Select Type</option>
+                  <option value="lithium">Lithium</option>
+                </Select>
+              </FormGroup>
+              
+              <FormGroup>
+                <Label htmlFor="Alimentación_Autonomía de la batería">Battery Autonomy (hours)</Label>
+                <Select
+                  id="Alimentación_Autonomía de la batería"
+                  name="Alimentación_Autonomía de la batería"
+                  value={formData["Alimentación_Autonomía de la batería"]}
+                  onChange={handleChange}
+                >
+                  <option value="">Select Hours</option>
+                  <option value="5">5 hours</option>
+                  <option value="6">6 hours</option>
+                  <option value="7">7 hours</option>
+                  <option value="8">8 hours</option>
+                  <option value="9">9 hours</option>
+                  <option value="10">10 hours (Default)</option>
+                  <option value="12">12 hours</option>
+                  <option value="14">14 hours</option>
+                  <option value="15">15 hours</option>
+                  <option value="18">18 hours</option>
+                  <option value="20">20 hours</option>
+                </Select>
+              </FormGroup>
+              
+              <FormGroup>
+                <Label htmlFor="Alimentación_Vatios-hora">Watt-hours</Label>
+                <Select
+                  id="Alimentación_Vatios-hora"
+                  name="Alimentación_Vatios-hora"
+                  value={formData["Alimentación_Vatios-hora"]}
+                  onChange={handleChange}
+                >
+                  <option value="">Select Watt-hours</option>
+                  <option value="40">40 Wh</option>
+                  <option value="45">45 Wh</option>
+                  <option value="50">50 Wh</option>
+                  <option value="53">53 Wh</option>
+                  <option value="55">55 Wh (Default)</option>
+                  <option value="60">60 Wh</option>
+                  <option value="65">65 Wh</option>
+                  <option value="70">70 Wh</option>
+                  <option value="75">75 Wh</option>
+                  <option value="80">80 Wh</option>
+                  <option value="90">90 Wh</option>
+                  <option value="99">99 Wh</option>
+                  <option value="100">100 Wh</option>
+                </Select>
+              </FormGroup>
+            </FormGrid>
+          </FormSection>
+        )}
+        
+        {/* Add after the battery section, but only for desktops */}
+        {formData["is_laptop"] === "0" && (
+          <FormSection>
+            <SectionTitle>Power Supply</SectionTitle>
+            <FormGrid>
+              <FormGroup>
+                <Label htmlFor="Propiedades de la carcasa_Alimentación">Power Supply Wattage</Label>
+                <Select
+                  id="Propiedades de la carcasa_Alimentación"
+                  name="Propiedades de la carcasa_Alimentación"
+                  value={formData["Propiedades de la carcasa_Alimentación"]}
+                  onChange={handleChange}
+                >
+                  <option value="">Select Wattage</option>
+                  <option value="0-200W">0-200W</option>
+                  <option value="201-400W">201-400W</option>
+                  <option value="401-600W">401-600W (Recommended)</option>
+                  <option value="601-800W">601-800W</option>
+                  <option value="801-1000W">801-1000W</option>
+                </Select>
+              </FormGroup>
+              
+              <FormGroup>
+                <Label htmlFor="Propiedades de la carcasa_Tipo de caja">Case Type</Label>
+                <Select
+                  id="Propiedades de la carcasa_Tipo de caja"
+                  name="Propiedades de la carcasa_Tipo de caja"
+                  value={formData["Propiedades de la carcasa_Tipo de caja"]}
+                  onChange={handleChange}
+                >
+                  <option value="">Select Case Type</option>
+                  <option value="desktop">Desktop</option>
+                  <option value="small_form_factor">Small Form Factor</option>
+                  <option value="torre">Tower (Standard)</option>
+                </Select>
+              </FormGroup>
+            </FormGrid>
+          </FormSection>
+        )}
         
         <FormSection>
           <SectionTitle>Classification</SectionTitle>
@@ -888,20 +1144,18 @@ const PricePredictorPage = () => {
                 onChange={handleChange}
               >
                 <option value="">Select Type</option>
-                <option value="Laptop – Standard">Standard Laptop</option>
-                <option value="Laptop – Gaming">Gaming Laptop</option>
+                {formData["is_laptop"] === "1" ? (
+                  <>
+                    <option value="Laptop – Standard">Standard Laptop</option>
+                    <option value="Laptop – Gaming">Gaming Laptop</option>
+                  </>
+                ) : (
+                  <>
+                    <option value="Desktop – Standard">Standard Desktop</option>
+                    <option value="Desktop – Gaming">Gaming Desktop</option>
+                  </>
+                )}
               </Select>
-            </FormGroup>
-            
-            <FormGroup style={{ display: 'none' }}>
-              <Label htmlFor="is_laptop">Is Laptop</Label>
-              <Input
-                type="hidden"
-                id="is_laptop"
-                name="is_laptop"
-                value="1"
-                readOnly
-              />
             </FormGroup>
           </FormGrid>
         </FormSection>

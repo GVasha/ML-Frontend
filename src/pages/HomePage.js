@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import styled from 'styled-components';
-import ProductCard from '../components/ProductCard';
-import laptops from '../data/laptopData';
-import { FaLaptop, FaGamepad, FaBriefcase, FaFilter, FaSortAmountDown } from 'react-icons/fa';
+import ClusterLaptops from '../components/ClusterLaptops';
+import { FaLaptop, FaGamepad, FaBriefcase } from 'react-icons/fa';
 
 const Hero = styled.div`
   background: linear-gradient(135deg, ${({ theme }) => theme.colors.secondary} 0%, ${({ theme }) => theme.colors.primary} 100%);
@@ -127,67 +126,8 @@ const CategoryDescription = styled.p`
   color: #666;
 `;
 
-const ProductsSection = styled.div`
-  margin: 3rem 0;
-`;
-
-const FilterSection = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 2rem;
-  
-  @media (max-width: ${({ theme }) => theme.breakpoints.mobile}) {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 1rem;
-  }
-`;
-
-const FilterButton = styled.button`
-  display: flex;
-  align-items: center;
-  background-color: #f0f0f0;
-  color: ${({ theme }) => theme.colors.dark};
-  border: none;
-  border-radius: 4px;
-  padding: 0.6rem 1rem;
-  font-size: 0.9rem;
-  
-  svg {
-    margin-right: 0.5rem;
-  }
-  
-  &:hover {
-    background-color: #e5e5e5;
-  }
-`;
-
-const SortSelect = styled.select`
-  padding: 0.6rem 1rem;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 0.9rem;
-  background-color: white;
-`;
-
-const ProductGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 2rem;
-  
-  @media (max-width: ${({ theme }) => theme.breakpoints.desktop}) {
-    grid-template-columns: repeat(2, 1fr);
-  }
-  
-  @media (max-width: ${({ theme }) => theme.breakpoints.mobile}) {
-    grid-template-columns: 1fr;
-  }
-`;
-
 const HomePage = () => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState('recommended');
   
   const handleSearch = (e) => {
     e.preventDefault();
@@ -200,9 +140,9 @@ const HomePage = () => {
       <Hero>
         <div className="container">
           <HeroContent>
-            <HeroTitle>Find Your Perfect Laptop</HeroTitle>
+            <HeroTitle>Find Your Perfect Computer</HeroTitle>
             <HeroSubtitle>
-              Compare specs and prices across thousands of models to find the right laptop for your needs.
+              Compare specs and prices across thousands of models to find the right laptop or desktop for your needs.
             </HeroSubtitle>
             <SearchForm onSubmit={handleSearch}>
               <SearchInput 
@@ -226,7 +166,7 @@ const HomePage = () => {
                 <CategoryIcon>
                   <FaGamepad />
                 </CategoryIcon>
-                <CategoryTitle>Gaming Laptops</CategoryTitle>
+                <CategoryTitle>Gaming Computers</CategoryTitle>
                 <CategoryDescription>
                   High-performance machines with dedicated graphics cards for the ultimate gaming experience.
                 </CategoryDescription>
@@ -238,9 +178,9 @@ const HomePage = () => {
                 <CategoryIcon>
                   <FaBriefcase />
                 </CategoryIcon>
-                <CategoryTitle>Business Laptops</CategoryTitle>
+                <CategoryTitle>Business Computers</CategoryTitle>
                 <CategoryDescription>
-                  Reliable, secure laptops with long battery life and professional features.
+                  Reliable, secure laptops and desktops with professional features for productivity.
                 </CategoryDescription>
               </CategoryContent>
             </CategoryCard>
@@ -259,35 +199,7 @@ const HomePage = () => {
           </CategoryGrid>
         </CategorySection>
         
-        <ProductsSection>
-          <SectionTitle>Featured Laptops</SectionTitle>
-          
-          <FilterSection>
-            <FilterButton>
-              <FaFilter /> Filter
-            </FilterButton>
-            
-            <div>
-              <FaSortAmountDown style={{ marginRight: '5px' }} />
-              <SortSelect 
-                value={sortBy} 
-                onChange={(e) => setSortBy(e.target.value)}
-              >
-                <option value="recommended">Recommended</option>
-                <option value="price_low">Price: Low to High</option>
-                <option value="price_high">Price: High to Low</option>
-                <option value="rating">Highest Rated</option>
-                <option value="newest">Newest First</option>
-              </SortSelect>
-            </div>
-          </FilterSection>
-          
-          <ProductGrid>
-            {laptops.map(laptop => (
-              <ProductCard key={laptop.id} product={laptop} />
-            ))}
-          </ProductGrid>
-        </ProductsSection>
+        <ClusterLaptops />
       </div>
     </div>
   );

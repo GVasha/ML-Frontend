@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
-import laptops from '../data/laptopData';
-import { FaStar, FaRegStar, FaStarHalfAlt, FaShoppingCart, FaArrowLeft, FaHeart, FaShare, FaTruck, FaShieldAlt, FaCheckCircle } from 'react-icons/fa';
+import { FaStar, FaRegStar, FaStarHalfAlt, FaShoppingCart, FaArrowLeft, FaHeart, FaShare, FaTruck, FaShieldAlt, FaCheckCircle, FaLaptop, FaDesktop, FaMicrochip, FaMemory, FaHdd } from 'react-icons/fa';
 import { predictPrice } from '../services/api';
 import testApi from '../services/testApi';
 
@@ -250,6 +249,17 @@ const SimilarLaptopCard = styled.div`
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 `;
 
+const SpecsList = styled.ul`
+  list-style: none;
+  padding-left: 0;
+  margin-bottom: 1rem;
+`;
+
+const DeviceIcon = styled.div`
+  font-size: 8rem;
+  margin-bottom: 1rem;
+`;
+
 const renderStars = (rating) => {
   const stars = [];
   const fullStars = Math.floor(rating);
@@ -270,13 +280,15 @@ const renderStars = (rating) => {
 
 const ProductPage = () => {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('specs');
   const [product, setProduct] = useState(null);
   const [predictedPrice, setPredictedPrice] = useState(null);
   const [similarLaptops, setSimilarLaptops] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [apiConnected, setApiConnected] = useState(false);
+  const [allLaptops, setAllLaptops] = useState([]);
 
   useEffect(() => {
     // Test API connection on component mount
@@ -285,43 +297,85 @@ const ProductPage = () => {
       setApiConnected(isConnected);
     };
     checkApiConnection();
-  }, []);
+    
+    // Load all laptops from JSON
+    const loadLaptops = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch('/csvjson.json');
+        if (!response.ok) {
+          throw new Error('Failed to load laptop data');
+        }
+        
+        const data = await response.json();
+        setAllLaptops(data);
+        
+        // Find the specific laptop by index
+        const productIndex = parseInt(id);
+        if (isNaN(productIndex) || productIndex < 0 || productIndex >= data.length) {
+          throw new Error('Product not found');
+        }
+        
+        setProduct(data[productIndex]);
+      } catch (err) {
+        console.error('Error loading laptop data:', err);
+        setError('Failed to load laptop data. Please try again later.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    loadLaptops();
+  }, [id]);
 
   useEffect(() => {
-    const foundProduct = laptops.find(laptop => laptop.id === parseInt(id));
-    setProduct(foundProduct);
-    
-    if (foundProduct && apiConnected) {
-      predictProductPrice(foundProduct);
+    if (product && apiConnected) {
+      predictProductPrice(product);
     }
-  }, [id, apiConnected]);
+  }, [product, apiConnected]);
 
   const predictProductPrice = async (laptop) => {
-    setLoading(true);
-    setError(null);
     try {
       // Convert laptop data to match backend expected format
       const laptopSpecs = {
-        'Pantalla_Tamaño de la pantalla': parseFloat(laptop.specs.display.size),
-        'Procesador_Procesador': laptop.specs.processor.model,
-        'RAM_Memoria RAM': parseInt(laptop.specs.memory.size),
-        'Disco duro_Capacidad de memoria SSD': parseInt(laptop.specs.storage.primary.capacity),
-        'Gráfica_Tarjeta gráfica': laptop.specs.graphics.model,
-        'Alimentación_Batería': parseInt(laptop.specs.battery.capacity)
+        'Pantalla_Tamaño de la pantalla': laptop['Pantalla_Tamaño de la pantalla'],
+        'Procesador_Procesador': laptop['Procesador_Procesador'],
+        'RAM_Memoria RAM': laptop['RAM_Memoria RAM'],
+        'Disco duro_Capacidad de memoria SSD': laptop['Disco duro_Capacidad de memoria SSD'],
+        'Gráfica_Tarjeta gráfica': laptop['Gráfica_Tarjeta gráfica'],
+        'Alimentación_Batería': laptop['Alimentación_Batería'],
+        'is_laptop': laptop['is_laptop'] || 1
       };
 
       const prediction = await predictPrice(laptopSpecs);
       setPredictedPrice(prediction.predicted_price);
       setSimilarLaptops(prediction.nearest_recommendations || []);
     } catch (err) {
-      setError('Failed to predict price. Please try again later.');
       console.error('Prediction error:', err);
-    } finally {
-      setLoading(false);
     }
   };
+  
+  // Find similar laptops in the same cluster
+  const findSimilarLaptops = () => {
+    if (!product || !allLaptops.length) return [];
+    
+    return allLaptops
+      .filter(laptop => 
+        laptop.cluster === product.cluster && 
+        laptop.Título !== product.Título
+      )
+      .slice(0, 4);  // Just get the top 4 similar laptops
+  };
 
-  if (!product) {
+  if (loading) {
+    return (
+      <div className="container">
+        <h2>Loading product details...</h2>
+      </div>
+    );
+  }
+
+  if (error || !product) {
     return (
       <div className="container">
         <h2>Product not found</h2>
@@ -329,6 +383,8 @@ const ProductPage = () => {
       </div>
     );
   }
+  
+  const similar = findSimilarLaptops();
   
   return (
     <div className="container">
@@ -349,25 +405,27 @@ const ProductPage = () => {
           <FaArrowLeft style={{ marginRight: '5px' }} />
         </Link>
         <BreadcrumbLink to="/">Home</BreadcrumbLink> / 
-        <BreadcrumbLink to={`/category/${product.brand.toLowerCase()}`}>{product.brand}</BreadcrumbLink> / 
-        <span>{product.title}</span>
+        <span>Cluster {product.cluster}</span> / 
+        <span>{product.Título}</span>
       </Breadcrumb>
       
       <ProductGrid>
         <ImageSection>
-          <ProductImage src={product.image} alt={product.title} />
+          <DeviceIcon style={{ fontSize: '8rem' }}>
+            {product.is_laptop === 1 ? <FaLaptop /> : <FaDesktop />}
+          </DeviceIcon>
         </ImageSection>
         
         <ProductInfo>
-          <Brand>{product.brand}</Brand>
-          <Title>{product.title}</Title>
+          <Brand>{product.marca || 'Unknown Brand'}</Brand>
+          <Title>{product.Título}</Title>
           
           <StarsContainer>
-            {renderStars(product.rating)}
-            <Rating>{product.rating} stars - {product.sellerRating} seller rating</Rating>
+            {renderStars(4)}
+            <Rating>4.0 stars</Rating>
           </StarsContainer>
           
-          <Price>${product.price.toFixed(2)}</Price>
+          <Price>${product.Precio_Rango ? product.Precio_Rango.toFixed(2) : 'N/A'}</Price>
           
           <ActionButtons>
             <AddToCartButton>
@@ -382,13 +440,13 @@ const ProductPage = () => {
           </ActionButtons>
           
           <ShippingInfo>
-            <FaTruck /> {product.shipping}
+            <FaTruck /> Free shipping
           </ShippingInfo>
           <ShippingInfo>
-            <FaShieldAlt /> {product.warranty}
+            <FaShieldAlt /> 1 Year Warranty
           </ShippingInfo>
           <ShippingInfo>
-            <FaCheckCircle /> {product.condition}
+            <FaCheckCircle /> New
           </ShippingInfo>
         </ProductInfo>
       </ProductGrid>
@@ -420,141 +478,130 @@ const ProductPage = () => {
             <div>
               <SpecCategory>
                 <SpecCategoryTitle>Processor</SpecCategoryTitle>
-                <SpecRow>
-                  <SpecLabel>Brand</SpecLabel>
-                  <SpecValue>{product.specs.processor.brand}</SpecValue>
-                </SpecRow>
-                <SpecRow>
-                  <SpecLabel>Model</SpecLabel>
-                  <SpecValue>{product.specs.processor.model}</SpecValue>
-                </SpecRow>
-                <SpecRow>
-                  <SpecLabel>Cores</SpecLabel>
-                  <SpecValue>{product.specs.processor.cores}</SpecValue>
-                </SpecRow>
-                <SpecRow>
-                  <SpecLabel>Base Clock Speed</SpecLabel>
-                  <SpecValue>{product.specs.processor.baseClockSpeed}</SpecValue>
-                </SpecRow>
-                <SpecRow>
-                  <SpecLabel>Turbo Boost Speed</SpecLabel>
-                  <SpecValue>{product.specs.processor.turboBoostSpeed}</SpecValue>
-                </SpecRow>
-                <SpecRow>
-                  <SpecLabel>Cache</SpecLabel>
-                  <SpecValue>{product.specs.processor.cache}</SpecValue>
-                </SpecRow>
+                {product['Procesador_Procesador'] && (
+                  <SpecRow>
+                    <SpecLabel>Model</SpecLabel>
+                    <SpecValue>{product['Procesador_Procesador']}</SpecValue>
+                  </SpecRow>
+                )}
+                {product['Procesador_Número de núcleos del procesador'] && (
+                  <SpecRow>
+                    <SpecLabel>Cores</SpecLabel>
+                    <SpecValue>{product['Procesador_Número de núcleos del procesador']}</SpecValue>
+                  </SpecRow>
+                )}
+                {product['Procesador_Frecuencia turbo máx.'] && (
+                  <SpecRow>
+                    <SpecLabel>Turbo Frequency</SpecLabel>
+                    <SpecValue>{product['Procesador_Frecuencia turbo máx.']} GHz</SpecValue>
+                  </SpecRow>
+                )}
+                {product['Procesador_Caché'] && (
+                  <SpecRow>
+                    <SpecLabel>Cache</SpecLabel>
+                    <SpecValue>{product['Procesador_Caché']} MB</SpecValue>
+                  </SpecRow>
+                )}
               </SpecCategory>
               
               <SpecCategory>
                 <SpecCategoryTitle>Memory</SpecCategoryTitle>
-                <SpecRow>
-                  <SpecLabel>Type</SpecLabel>
-                  <SpecValue>{product.specs.memory.type}</SpecValue>
-                </SpecRow>
-                <SpecRow>
-                  <SpecLabel>Size</SpecLabel>
-                  <SpecValue>{product.specs.memory.size}</SpecValue>
-                </SpecRow>
-                <SpecRow>
-                  <SpecLabel>Speed</SpecLabel>
-                  <SpecValue>{product.specs.memory.speed}</SpecValue>
-                </SpecRow>
-                <SpecRow>
-                  <SpecLabel>Slots</SpecLabel>
-                  <SpecValue>{product.specs.memory.slots}</SpecValue>
-                </SpecRow>
-                <SpecRow>
-                  <SpecLabel>Expandable To</SpecLabel>
-                  <SpecValue>{product.specs.memory.expandableTo}</SpecValue>
-                </SpecRow>
+                {product['RAM_Memoria RAM'] && (
+                  <SpecRow>
+                    <SpecLabel>Size</SpecLabel>
+                    <SpecValue>{product['RAM_Memoria RAM']} GB</SpecValue>
+                  </SpecRow>
+                )}
+                {product['RAM_Tipo de RAM'] && (
+                  <SpecRow>
+                    <SpecLabel>Type</SpecLabel>
+                    <SpecValue>{product['RAM_Tipo de RAM']}</SpecValue>
+                  </SpecRow>
+                )}
               </SpecCategory>
               
               <SpecCategory>
                 <SpecCategoryTitle>Storage</SpecCategoryTitle>
-                <SpecRow>
-                  <SpecLabel>Type</SpecLabel>
-                  <SpecValue>{product.specs.storage.primary.type}</SpecValue>
-                </SpecRow>
-                <SpecRow>
-                  <SpecLabel>Interface</SpecLabel>
-                  <SpecValue>{product.specs.storage.primary.interface}</SpecValue>
-                </SpecRow>
-                <SpecRow>
-                  <SpecLabel>Capacity</SpecLabel>
-                  <SpecValue>{product.specs.storage.primary.capacity}</SpecValue>
-                </SpecRow>
+                {product['Disco duro_Tipo de disco duro'] && (
+                  <SpecRow>
+                    <SpecLabel>Type</SpecLabel>
+                    <SpecValue>{product['Disco duro_Tipo de disco duro']}</SpecValue>
+                  </SpecRow>
+                )}
+                {product['Disco duro_Capacidad de memoria SSD'] && (
+                  <SpecRow>
+                    <SpecLabel>SSD Capacity</SpecLabel>
+                    <SpecValue>{product['Disco duro_Capacidad de memoria SSD']} GB</SpecValue>
+                  </SpecRow>
+                )}
               </SpecCategory>
             </div>
             
             <div>
               <SpecCategory>
                 <SpecCategoryTitle>Graphics</SpecCategoryTitle>
-                <SpecRow>
-                  <SpecLabel>Brand</SpecLabel>
-                  <SpecValue>{product.specs.graphics.brand}</SpecValue>
-                </SpecRow>
-                <SpecRow>
-                  <SpecLabel>Model</SpecLabel>
-                  <SpecValue>{product.specs.graphics.model}</SpecValue>
-                </SpecRow>
-                <SpecRow>
-                  <SpecLabel>Memory</SpecLabel>
-                  <SpecValue>{product.specs.graphics.memory}</SpecValue>
-                </SpecRow>
+                {product['Gráfica_Tarjeta gráfica'] && (
+                  <SpecRow>
+                    <SpecLabel>Model</SpecLabel>
+                    <SpecValue>{product['Gráfica_Tarjeta gráfica']}</SpecValue>
+                  </SpecRow>
+                )}
+                {product['Gráfica_Memoria gráfica'] && (
+                  <SpecRow>
+                    <SpecLabel>Memory</SpecLabel>
+                    <SpecValue>{product['Gráfica_Memoria gráfica']} GB</SpecValue>
+                  </SpecRow>
+                )}
+                {product['Gráfica_Tipo de memoria gráfica'] && (
+                  <SpecRow>
+                    <SpecLabel>Memory Type</SpecLabel>
+                    <SpecValue>{product['Gráfica_Tipo de memoria gráfica']}</SpecValue>
+                  </SpecRow>
+                )}
               </SpecCategory>
               
               <SpecCategory>
                 <SpecCategoryTitle>Display</SpecCategoryTitle>
-                <SpecRow>
-                  <SpecLabel>Size</SpecLabel>
-                  <SpecValue>{product.specs.display.size}</SpecValue>
-                </SpecRow>
-                <SpecRow>
-                  <SpecLabel>Resolution</SpecLabel>
-                  <SpecValue>{product.specs.display.resolution}</SpecValue>
-                </SpecRow>
-                <SpecRow>
-                  <SpecLabel>Type</SpecLabel>
-                  <SpecValue>{product.specs.display.type}</SpecValue>
-                </SpecRow>
-                <SpecRow>
-                  <SpecLabel>Refresh Rate</SpecLabel>
-                  <SpecValue>{product.specs.display.refreshRate}</SpecValue>
-                </SpecRow>
-                <SpecRow>
-                  <SpecLabel>Brightness</SpecLabel>
-                  <SpecValue>{product.specs.display.brightness}</SpecValue>
-                </SpecRow>
-                <SpecRow>
-                  <SpecLabel>Touchscreen</SpecLabel>
-                  <SpecValue>{product.specs.display.touchscreen ? 'Yes' : 'No'}</SpecValue>
-                </SpecRow>
-              </SpecCategory>
-              
-              <SpecCategory>
-                <SpecCategoryTitle>Battery</SpecCategoryTitle>
-                <SpecRow>
-                  <SpecLabel>Capacity</SpecLabel>
-                  <SpecValue>{product.specs.battery.capacity}</SpecValue>
-                </SpecRow>
-                <SpecRow>
-                  <SpecLabel>Battery Life</SpecLabel>
-                  <SpecValue>{product.specs.battery.batteryLife}</SpecValue>
-                </SpecRow>
-                <SpecRow>
-                  <SpecLabel>Fast Charging</SpecLabel>
-                  <SpecValue>{product.specs.battery.fastCharging ? 'Yes' : 'No'}</SpecValue>
-                </SpecRow>
-              </SpecCategory>
-              
-              <SpecCategory>
-                <SpecCategoryTitle>Ports</SpecCategoryTitle>
-                {product.specs.ports.map((port, index) => (
-                  <SpecRow key={index}>
-                    <SpecValue>{port}</SpecValue>
+                {product['Pantalla_Tamaño de la pantalla'] && (
+                  <SpecRow>
+                    <SpecLabel>Size</SpecLabel>
+                    <SpecValue>{product['Pantalla_Tamaño de la pantalla']} inches</SpecValue>
                   </SpecRow>
-                ))}
+                )}
+                {product['Pantalla_Tecnología de la pantalla'] && (
+                  <SpecRow>
+                    <SpecLabel>Technology</SpecLabel>
+                    <SpecValue>{product['Pantalla_Tecnología de la pantalla']}</SpecValue>
+                  </SpecRow>
+                )}
+              </SpecCategory>
+              
+              {product.is_laptop === 1 && (
+                <SpecCategory>
+                  <SpecCategoryTitle>Battery</SpecCategoryTitle>
+                  {product['Alimentación_Vatios-hora'] && (
+                    <SpecRow>
+                      <SpecLabel>Capacity</SpecLabel>
+                      <SpecValue>{product['Alimentación_Vatios-hora']} Wh</SpecValue>
+                    </SpecRow>
+                  )}
+                  {product['Alimentación_Autonomía de la batería'] && (
+                    <SpecRow>
+                      <SpecLabel>Battery Life</SpecLabel>
+                      <SpecValue>{product['Alimentación_Autonomía de la batería']} hours</SpecValue>
+                    </SpecRow>
+                  )}
+                </SpecCategory>
+              )}
+              
+              <SpecCategory>
+                <SpecCategoryTitle>Physical</SpecCategoryTitle>
+                {product['Medidas y peso_Peso'] && (
+                  <SpecRow>
+                    <SpecLabel>Weight</SpecLabel>
+                    <SpecValue>{product['Medidas y peso_Peso']} kg</SpecValue>
+                  </SpecRow>
+                )}
               </SpecCategory>
             </div>
           </SpecsTable>
@@ -562,19 +609,30 @@ const ProductPage = () => {
         
         {activeTab === 'description' && (
           <ProductDescription>
-            <p>{product.description}</p>
+            <h3>Product Description</h3>
+            <p>Experience exceptional performance with this {product.is_laptop === 1 ? 'laptop' : 'desktop'} featuring the powerful {product['Procesador_Procesador'] || 'processor'} and {product['RAM_Memoria RAM'] || ''} GB of RAM. Perfect for {product['product_type_group']?.includes('Gaming') ? 'gaming and content creation' : 'productivity and everyday computing'}.</p>
             
             <h3>Key Features</h3>
-            <p>Experience the ultimate performance with the {product.title}, featuring the powerful {product.specs.processor.brand} {product.specs.processor.model} processor, {product.specs.memory.size} {product.specs.memory.type} RAM, and {product.specs.storage.primary.capacity} {product.specs.storage.primary.type} storage.</p>
-            
-            <h3>Display</h3>
-            <p>Enjoy crystal-clear visuals on the {product.specs.display.size} {product.specs.display.type} display with {product.specs.display.resolution} resolution and {product.specs.display.refreshRate} refresh rate.</p>
-            
-            <h3>Graphics</h3>
-            <p>Powered by {product.specs.graphics.brand} {product.specs.graphics.model} with {product.specs.graphics.memory} memory, this laptop delivers exceptional graphics performance for all your needs.</p>
-            
-            <h3>Battery Life</h3>
-            <p>With a {product.specs.battery.capacity} battery, enjoy {product.specs.battery.batteryLife} of usage on a single charge. {product.specs.battery.fastCharging ? 'Fast charging technology gets you back to work quickly.' : ''}</p>
+            <ul>
+              {product['Procesador_Procesador'] && (
+                <li>Powerful {product['Procesador_Procesador']} processor</li>
+              )}
+              {product['RAM_Memoria RAM'] && (
+                <li>{product['RAM_Memoria RAM']} GB {product['RAM_Tipo de RAM'] || 'RAM'}</li>
+              )}
+              {product['Disco duro_Capacidad de memoria SSD'] && (
+                <li>Fast {product['Disco duro_Capacidad de memoria SSD']} GB {product['Disco duro_Tipo de disco duro'] || 'SSD'} storage</li>
+              )}
+              {product['Gráfica_Tarjeta gráfica'] && (
+                <li>{product['Gráfica_Tarjeta gráfica']} graphics</li>
+              )}
+              {product['Pantalla_Tamaño de la pantalla'] && product.is_laptop === 1 && (
+                <li>{product['Pantalla_Tamaño de la pantalla']}" {product['Pantalla_Tecnología de la pantalla'] || ''} display</li>
+              )}
+              {product['Sistema operativo_Sistema operativo'] && (
+                <li>{product['Sistema operativo_Sistema operativo']} operating system</li>
+              )}
+            </ul>
           </ProductDescription>
         )}
         
@@ -585,28 +643,47 @@ const ProductPage = () => {
         )}
       </TabsSection>
       
-      <PricePrediction>
-        <h2>AI Price Prediction</h2>
-        {loading ? (
-          <p>Calculating price prediction...</p>
-        ) : error ? (
-          <p style={{ color: 'red' }}>{error}</p>
-        ) : predictedPrice ? (
-          <>
-            <p>Predicted Market Price: ${predictedPrice.toFixed(2)}</p>
-            <p>Current Price: ${product.price}</p>
-            <p>Price Difference: ${(product.price - predictedPrice).toFixed(2)}</p>
-          </>
-        ) : null}
-      </PricePrediction>
+      {predictedPrice && (
+        <PricePrediction>
+          <h2>AI Price Prediction</h2>
+          <p>Our AI model predicts this {product.is_laptop === 1 ? 'laptop' : 'desktop'} should cost approximately:</p>
+          <Price style={{ fontSize: '1.8rem' }}>${predictedPrice.toFixed(2)}</Price>
+          <p>Current price: ${product.Precio_Rango.toFixed(2)}</p>
+          <p style={{ 
+            color: product.Precio_Rango > predictedPrice ? 'green' : 'red',
+            fontWeight: 'bold'
+          }}>
+            This product is {product.Precio_Rango > predictedPrice ? 'above' : 'below'} the AI predicted market price
+            by ${Math.abs(product.Precio_Rango - predictedPrice).toFixed(2)}
+          </p>
+        </PricePrediction>
+      )}
 
-      {similarLaptops.length > 0 && (
+      {similar.length > 0 && (
         <SimilarLaptops>
-          <h2>Similar Laptops</h2>
-          {similarLaptops.map((laptop, index) => (
-            <SimilarLaptopCard key={index}>
+          <h2>Similar Computers in Cluster {product.cluster}</h2>
+          {similar.map((laptop, index) => (
+            <SimilarLaptopCard key={index} onClick={() => navigate(`/product/${allLaptops.indexOf(laptop)}`)}>
               <h3>{laptop.Título}</h3>
-              <p>Price Range: {laptop.Precio_Rango}</p>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <SpecsList style={{ flex: 1 }}>
+                  {laptop['Procesador_Procesador'] && (
+                    <li>
+                      <FaMicrochip />
+                      {laptop['Procesador_Procesador']}
+                    </li>
+                  )}
+                  {laptop['RAM_Memoria RAM'] && (
+                    <li>
+                      <FaMemory />
+                      {laptop['RAM_Memoria RAM']} GB RAM
+                    </li>
+                  )}
+                </SpecsList>
+                <div>
+                  <strong>${laptop.Precio_Rango.toFixed(2)}</strong>
+                </div>
+              </div>
             </SimilarLaptopCard>
           ))}
         </SimilarLaptops>
