@@ -1,0 +1,1 @@
+This directory contains placeholder laptop images for when external image sources fail to load. 
