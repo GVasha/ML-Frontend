@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { predictPrice } from '../services/api';
 import { searchAmazon } from '../services/amazonApi';
@@ -409,6 +409,19 @@ const PricePredictorPage = () => {
   const [amazonError, setAmazonError] = useState(null);
   const [amazonSearchTerms, setAmazonSearchTerms] = useState('');
   
+  // Load device type from localStorage when component mounts
+  useEffect(() => {
+    const savedDeviceType = localStorage.getItem('selectedDeviceType');
+    if (savedDeviceType) {
+      // Convert from "Laptop"/"Desktop" string to "1"/"0" for is_laptop field
+      const isLaptop = savedDeviceType === 'Laptop' ? "1" : "0";
+      console.log(`Retrieved device type from localStorage: ${savedDeviceType} (is_laptop=${isLaptop})`);
+      
+      // Update form data with the saved device type
+      handleDeviceTypeChange(isLaptop === "1");
+    }
+  }, []);
+  
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData({
@@ -582,6 +595,10 @@ const PricePredictorPage = () => {
           processedData[key] = processInputValue(key, value);
         }
       });
+      
+      // Explicitly set Tipo based on is_laptop value
+      processedData.Tipo = formData.is_laptop === "1" ? "Laptop" : "Desktop";
+      console.log(`Setting Tipo to ${processedData.Tipo} based on is_laptop=${formData.is_laptop}`);
       
       const response = await predictPrice(processedData);
       setResult(response);
